@@ -86,7 +86,7 @@ with st.sidebar:
     model_option = st.selectbox(
         "Select Model",
         ["sreenathsree1578/facial_emotion", "sreenathsree1578/emotion_detection"],
-        index=0 # Default to emotion_detection
+        index=1  # Default to emotion_detection
     )
     quality = st.selectbox("Select Video Quality", ["Low (480p)", "Medium (720p)", "High (1080p)"], index=2)  # Default to High
     fps = st.selectbox("Select FPS", [15, 30, 60], index=2)  # Default to 60
@@ -94,8 +94,8 @@ with st.sidebar:
 # Map quality to resolution
 quality_map = {
     "High (1080p)": {"width": 1920, "height": 1080},
-    "Low (480p)": {"width": 854, "height": 480},
-    "Medium (720p)": {"width": 1280, "height": 720}
+    "Medium (720p)": {"width": 1280, "height": 720},
+    "Low (480p)": {"width": 854, "height": 480}
 }
 resolution = quality_map[quality]
 
@@ -180,37 +180,53 @@ rtc_config = RTCConfiguration({
     "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
 })
 
-# Try camera 1, fallback to camera 0
-try:
-    webrtc_streamer(
-        key="emotion-detection",
-        video_processor_factory=EmotionProcessor,
-        media_stream_constraints={
-            "video": {
-                "width": {"ideal": resolution["width"]},
-                "height": {"ideal": resolution["height"]},
-                "frameRate": {"ideal": fps},
-                "deviceId": {"exact": 1}  # Try camera 1
+# Auto-select the first available camera
+def get_available_cameras():
+    index = 0
+    available_cameras = []
+    while True:
+        cap = cv2.VideoCapture(index, cv2.CAP_ANY)
+        if not cap.isOpened():
+            break
+        available_cameras.append(index)
+        cap.release()
+        index += 1
+    return available_cameras
+
+# Get and use the first available camera
+available_cameras = get_available_cameras()
+if not available_cameras:
+    st.error("No cameras found.")
+else:
+    selected_camera = available_cameras[0]  # Select the first available camera
+    st.write(f"Using camera {selected_camera}")
+    try:
+        webrtc_streamer(
+            key="emotion-detection",
+            video_processor_factory=EmotionProcessor,
+            media_stream_constraints={
+                "video": {
+                    "width": {"ideal": resolution["width"]},
+                    "height": {"ideal": resolution["height"]},
+                    "frameRate": {"ideal": fps},
+                    "deviceId": selected_camera  # Remove 'exact' to allow flexibility
+                },
+                "audio": False
             },
-            "audio": False
-        },
-        async_processing=True,
-        rtc_configuration=rtc_config
-    )
-except Exception as e:
-    st.warning(f"Camera 1 failed: {str(e)}. Switching to camera 0.")
-    webrtc_streamer(
-        key="emotion-detection-fallback",
-        video_processor_factory=EmotionProcessor,
-        media_stream_constraints={
-            "video": {
-                "width": {"ideal": resolution["width"]},
-                "height": {"ideal": resolution["height"]},
-                "frameRate": {"ideal": fps},
-                "deviceId": {"exact": 0}  # Fallback to camera 0
+            async_processing=True,
+            rtc_configuration=rtc_config
+        )
+    except Exception as e:
+        st.warning(f"Camera constraints failed: {str(e)}. Trying default constraints.")
+        webrtc_streamer(
+            key="emotion-detection-fallback",
+            video_processor_factory=EmotionProcessor,
+            media_stream_constraints={
+                "video": {
+                    "deviceId": selected_camera  # Minimal constraints
+                },
+                "audio": False
             },
-            "audio": False
-        },
-        async_processing=True,
-        rtc_configuration=rtc_config
-    )
+            async_processing=True,
+            rtc_configuration=rtc_config
+        )
