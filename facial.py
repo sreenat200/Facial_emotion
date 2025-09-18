@@ -185,7 +185,7 @@ def get_available_cameras():
     index = 0
     available_cameras = []
     while True:
-        cap = cv2.VideoCapture(index, cv2.CAP_ANY)  # Use CAP_ANY for broader compatibility
+        cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
         if not cap.isOpened():
             break
         available_cameras.append(index)
@@ -193,7 +193,7 @@ def get_available_cameras():
         index += 1
     return available_cameras
 
-# Get and use the first available camera
+# Get the first available camera
 available_cameras = get_available_cameras()
 if not available_cameras:
     st.error("No cameras found.")
