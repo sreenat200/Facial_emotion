@@ -10,10 +10,10 @@ from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfigurati
 
 # Define SimpleCNN architecture with PyTorchModelHubMixin
 class SimpleCNN(torch.nn.Module, PyTorchModelHubMixin):
-    def __init__(self, num_classes=7):
+    def __init__(self, num_classes=7, in_channels=1):
         super(SimpleCNN, self).__init__()
         self.features = torch.nn.Sequential(
-            torch.nn.Conv2d(1, 32, 3, padding=1),
+            torch.nn.Conv2d(in_channels, 32, 3, padding=1),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(2, 2),
             torch.nn.Conv2d(32, 64, 3, padding=1),
@@ -38,11 +38,12 @@ class SimpleCNN(torch.nn.Module, PyTorchModelHubMixin):
         return x
 
 # Transform for image processing
-transform_live = transforms.Compose([
-    transforms.Resize((48, 48)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,))
-])
+def get_transform(in_channels):
+    return transforms.Compose([
+        transforms.Resize((48, 48)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,) * in_channels, (0.5,) * in_channels)
+    ])
 
 # Emotion labels
 emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
@@ -63,16 +64,18 @@ def load_model(model_name):
         with open(config_path) as f:
             config = json.load(f)
         num_classes = config.get("num_classes", 7)
-        model = SimpleCNN(num_classes=num_classes)
+        in_channels = config.get("in_channels", 1 if model_name == "sreenathsree1578/facial_emotion" else 3)
+        model = SimpleCNN(num_classes=num_classes, in_channels=in_channels)
         model = model.from_pretrained(model_name)
         model.eval()
-        return model
+        return model, in_channels
     except Exception as e:
         st.error(f"Error loading {model_name}: {str(e)}. Using default.")
-        return SimpleCNN.from_pretrained(model_option if model_option == model_name else "sreenathsree1578/facial_emotion")
+        return SimpleCNN(num_classes=7, in_channels=1).from_pretrained("sreenathsree1578/facial_emotion"), 1
 
 # Load selected model
-model = load_model(model_option)
+model, in_channels = load_model(model_option)
+transform_live = get_transform(in_channels)
 
 # Custom VideoProcessor for streamlit-webrtc
 class EmotionProcessor(VideoProcessorBase):
@@ -85,9 +88,9 @@ class EmotionProcessor(VideoProcessorBase):
         faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
 
         for (x, y, w, h) in faces:
-            face = gray[y:y+h, x:x+w]
+            face = img[y:y+h, x:x+w] if in_channels == 3 else gray[y:y+h, x:x+w]
             face = cv2.resize(face, (48, 48))
-            face = transform_live(Image.fromarray(face)).unsqueeze(0)
+            face = transform_live(Image.fromarray(face if in_channels == 3 else face, mode='RGB' if in_channels == 3 else 'L')).unsqueeze(0)
             with torch.no_grad():
                 output = model(face)
                 _, pred = torch.max(output, 1)
@@ -102,7 +105,7 @@ rtc_config = RTCConfiguration({
     "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
 })
 
-# Start webcam stream with improved video quality
+# Start webcam stream with first camera
 webrtc_streamer(
     key="emotion-detection",
     video_processor_factory=EmotionProcessor,
@@ -110,7 +113,8 @@ webrtc_streamer(
         "video": {
             "width": {"ideal": 1280},
             "height": {"ideal": 720},
-            "frameRate": {"ideal": 30}
+            "frameRate": {"ideal": 30},
+            "deviceId": {"exact": 0}
         },
         "audio": False
     },
