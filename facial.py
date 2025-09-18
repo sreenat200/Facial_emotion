@@ -64,7 +64,8 @@ def load_model(model_name):
         with open(config_path) as f:
             config = json.load(f)
         num_classes = config.get("num_classes", 7)
-        in_channels = config.get("in_channels", 1 if model_name == "sreenathsree1578/facial_emotion" else 3)
+        # Force in_channels=3 for emotion_detection, 1 for facial_emotion
+        in_channels = 3 if model_name == "sreenathsree1578/emotion_detection" else 1
         model = SimpleCNN(num_classes=num_classes, in_channels=in_channels)
         model = model.from_pretrained(model_name)
         model.eval()
