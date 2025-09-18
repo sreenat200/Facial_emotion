@@ -78,13 +78,25 @@ def get_transform(in_channels):
 emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 
 # Streamlit app
-st.title("Live Facial Emotion Detection")
+st.markdown("<h3>Live Facial Emotion Detection</h3>", unsafe_allow_html=True)
 
 # Model selection
 model_option = st.selectbox(
     "Select Model",
     ["sreenathsree1578/facial_emotion", "sreenathsree1578/emotion_detection"]
 )
+
+# Video quality and FPS selection
+quality = st.selectbox("Select Video Quality", ["Low (480p)", "Medium (720p)", "High (1080p)"])
+fps = st.selectbox("Select FPS", [15, 30, 60])
+
+# Map quality to resolution
+quality_map = {
+    "Low (480p)": {"width": 854, "height": 480},
+    "Medium (720p)": {"width": 1280, "height": 720},
+    "High (1080p)": {"width": 1920, "height": 1080}
+}
+resolution = quality_map[quality]
 
 @st.cache_resource
 def load_facial_emotion_model():
@@ -157,9 +169,9 @@ webrtc_streamer(
     video_processor_factory=EmotionProcessor,
     media_stream_constraints={
         "video": {
-            "width": {"ideal": 1280},
-            "height": {"ideal": 720},
-            "frameRate": {"ideal": 30},
+            "width": {"ideal": resolution["width"]},
+            "height": {"ideal": resolution["height"]},
+            "frameRate": {"ideal": fps},
             "deviceId": {"exact": 0}
         },
         "audio": False
