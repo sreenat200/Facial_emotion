@@ -1,7 +1,7 @@
-streamlit
-torch
-torchvision
-Pillow
-numpy
-huggingface-hub
-opencv-python-headless
+streamlit==1.29.0
+torch==2.0.1
+torchvision==0.15.2
+pillow==10.0.0
+numpy==1.24.3
+huggingface_hub==0.16.4
+opencv-python-headless==4.7.0.72
