@@ -80,22 +80,22 @@ emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 # Streamlit app
 st.markdown("<h3>Live Facial Emotion Detection</h3>", unsafe_allow_html=True)
 
-# Sidebar for model, quality, and FPS selection
+# Sidebar for model, quality, and FPS selection with highest values as default
 with st.sidebar:
     st.header("Settings")
     model_option = st.selectbox(
         "Select Model",
-        ["sreenathsree1578/facial_emotion", "sreenathsree1578/emotion_detection"]
+        ["sreenathsree1578/facial_emotion", "sreenathsree1578/emotion_detection"],
+        index=0 # Default to emotion_detection
     )
-    quality = st.selectbox("Select Video Quality", ["Low (480p)", "Medium (720p)", "High (1080p)"])
-    fps = st.selectbox("Select FPS", [15, 30, 60])
+    quality = st.selectbox("Select Video Quality", ["Low (480p)", "Medium (720p)", "High (1080p)"], index=2)  # Default to High
+    fps = st.selectbox("Select FPS", [15, 30, 60], index=2)  # Default to 60
 
 # Map quality to resolution
 quality_map = {
     "High (1080p)": {"width": 1920, "height": 1080},
     "Low (480p)": {"width": 854, "height": 480},
     "Medium (720p)": {"width": 1280, "height": 720}
-    
 }
 resolution = quality_map[quality]
 
@@ -136,6 +136,17 @@ else:
     model, in_channels = load_emotion_detection_model()
 transform_live = get_transform(in_channels)
 
+# Emotion color mapping
+emotion_colors = {
+    'angry': (0, 0, 255),    # Red
+    'disgust': (0, 255, 0),  # Green
+    'fear': (255, 0, 0),     # Blue (default)
+    'happy': (255, 0, 0),    # Blue (default)
+    'sad': (0, 165, 255),    # Orange
+    'surprise': (255, 0, 0), # Blue (default)
+    'neutral': (255, 0, 0)   # Blue (default)
+}
+
 # Custom VideoProcessor for streamlit-webrtc
 class EmotionProcessor(VideoProcessorBase):
     def __init__(self):
@@ -154,8 +165,13 @@ class EmotionProcessor(VideoProcessorBase):
                 output = model(face)
                 _, pred = torch.max(output, 1)
                 emotion = emotions[pred.item()] if pred.item() < len(emotions) else "unknown"
-            cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
-            cv2.putText(img, emotion, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
+            # Draw rectangle and text with emotion-specific color
+            color = emotion_colors.get(emotion, (255, 0, 0))  # Default to blue if unknown
+            cv2.rectangle(img, (x, y), (x+w, y+h), color, 2)
+            # Add white background for text
+            text_size = cv2.getTextSize(emotion, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)[0]
+            cv2.rectangle(img, (x, y-35), (x+text_size[0], y-5), (255, 255, 255), -1)  # White background
+            cv2.putText(img, emotion, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
         return frame.from_ndarray(img, format="bgr24")
 
