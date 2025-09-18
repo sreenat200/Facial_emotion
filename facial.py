@@ -60,19 +60,14 @@ model_option = st.selectbox(
 @st.cache_resource
 def load_model(model_name):
     try:
-        # Load config if available
         config_path = hf_hub_download(repo_id=model_name, filename="config.json")
         with open(config_path) as f:
             config = json.load(f)
         num_classes = config.get("num_classes", 7)
-        # Explicitly set in_channels for each model
+        # Force in_channels=3 for emotion_detection, 1 for facial_emotion
         in_channels = 3 if model_name == "sreenathsree1578/emotion_detection" else 1
         model = SimpleCNN(num_classes=num_classes, in_channels=in_channels)
-        
-        # Load state_dict manually to handle potential mismatches
-        state_dict_path = hf_hub_download(repo_id=model_name, filename="pytorch_model.bin")
-        state_dict = torch.load(state_dict_path, map_location=torch.device('cpu'))
-        model.load_state_dict(state_dict, strict=False)
+        model = model.from_pretrained(model_name)
         model.eval()
         return model, in_channels
     except Exception as e:
@@ -126,4 +121,4 @@ webrtc_streamer(
     },
     async_processing=True,
     rtc_configuration=rtc_config
-)
+)     
