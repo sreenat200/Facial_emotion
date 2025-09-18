@@ -4,8 +4,8 @@ import torch
 from torchvision import transforms
 from PIL import Image
 import numpy as np
-from huggingface_hub import PyTorchModelHubMixin
-import safetensors
+from huggingface_hub import PyTorchModelHubMixin, hf_hub_download
+import json
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
 # Define SimpleCNN architecture with PyTorchModelHubMixin
@@ -56,9 +56,23 @@ model_option = st.selectbox(
     ["sreenathsree1578/facial_emotion", "sreenathsree1578/emotion_detection"]
 )
 
+@st.cache_resource
+def load_model(model_name):
+    try:
+        config_path = hf_hub_download(repo_id=model_name, filename="config.json")
+        with open(config_path) as f:
+            config = json.load(f)
+        num_classes = config.get("num_classes", 7)
+        model = SimpleCNN(num_classes=num_classes)
+        model = model.from_pretrained(model_name)
+        model.eval()
+        return model
+    except Exception as e:
+        st.error(f"Error loading {model_name}: {str(e)}. Using default.")
+        return SimpleCNN.from_pretrained(model_option if model_option == model_name else "sreenathsree1578/facial_emotion")
+
 # Load selected model
-model = SimpleCNN.from_pretrained(model_option)
-model.eval()
+model = load_model(model_option)
 
 # Custom VideoProcessor for streamlit-webrtc
 class EmotionProcessor(VideoProcessorBase):
@@ -77,7 +91,7 @@ class EmotionProcessor(VideoProcessorBase):
             with torch.no_grad():
                 output = model(face)
                 _, pred = torch.max(output, 1)
-                emotion = emotions[pred.item()]
+                emotion = emotions[pred.item()] if pred.item() < len(emotions) else "unknown"
             cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
             cv2.putText(img, emotion, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
 
