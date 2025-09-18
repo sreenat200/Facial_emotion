@@ -82,11 +82,18 @@ rtc_config = RTCConfiguration({
     "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
 })
 
-# Start webcam stream with STUN configuration
+# Start webcam stream with improved video quality
 webrtc_streamer(
     key="emotion-detection",
     video_processor_factory=EmotionProcessor,
-    media_stream_constraints={"video": True, "audio": False},
+    media_stream_constraints={
+        "video": {
+            "width": {"ideal": 1280},  # Higher resolution (720p)
+            "height": {"ideal": 720},
+            "frameRate": {"ideal": 30}  # Higher frame rate
+        },
+        "audio": False
+    },
     async_processing=True,
     rtc_configuration=rtc_config
 )
