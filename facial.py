@@ -1,11 +1,12 @@
+import streamlit as st
 import cv2
 import torch
-import safetensors
 from torchvision import transforms
 from PIL import Image
-import streamlit as st
 import numpy as np
 from huggingface_hub import PyTorchModelHubMixin
+import safetensors
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
 # Define SimpleCNN architecture with PyTorchModelHubMixin
 class SimpleCNN(torch.nn.Module, PyTorchModelHubMixin):
@@ -40,7 +41,7 @@ class SimpleCNN(torch.nn.Module, PyTorchModelHubMixin):
 model = SimpleCNN.from_pretrained("sreenathsree1578/facial_emotion")
 model.eval()
 
-# Transform for live feed
+# Transform for image processing
 transform_live = transforms.Compose([
     transforms.Resize((48, 48)),
     transforms.ToTensor(),
@@ -50,38 +51,16 @@ transform_live = transforms.Compose([
 # Emotion labels
 emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 
-# Global variables
-camera_on = False
-cap = None
-frame_placeholder = st.empty()
+# Custom VideoProcessor for streamlit-webrtc
+class EmotionProcessor(VideoProcessorBase):
+    def __init__(self):
+        self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-# Function to start/stop camera
-def toggle_camera():
-    global camera_on, cap
-    if not camera_on:
-        cap = cv2.VideoCapture(0)
-        camera_on = True
-    else:
-        if cap is not None:
-            cap.release()
-        camera_on = False
+    def recv(self, frame):
+        img = frame.to_ndarray(format="bgr24")
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
 
-# Streamlit app
-st.title("Live Facial Emotion Detection")
-
-# Buttons
-if st.button("Start Emotion Detection"):
-    toggle_camera()
-
-if st.button("Stop Emotion Detection"):
-    toggle_camera()
-
-# Display video feed
-while camera_on and cap is not None:
-    ret, frame = cap.read()
-    if ret:
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml').detectMultiScale(gray, 1.3, 5)
         for (x, y, w, h) in faces:
             face = gray[y:y+h, x:x+w]
             face = cv2.resize(face, (48, 48))
@@ -90,14 +69,18 @@ while camera_on and cap is not None:
                 output = model(face)
                 _, pred = torch.max(output, 1)
                 emotion = emotions[pred.item()]
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-            cv2.putText(frame, emotion, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame_placeholder.image(frame, channels="RGB", use_column_width=True)
-    else:
-        break
+            cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+            cv2.putText(img, emotion, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
 
-# Cleanup on app close
-if cap is not None and not cap.isOpened():
-    cap.release()
+        return frame.from_ndarray(img, format="bgr24")
 
+# Streamlit app
+st.title("Live Facial Emotion Detection")
+
+# Start webcam stream
+webrtc_streamer(
+    key="emotion-detection",
+    video_processor_factory=EmotionProcessor,
+    media_stream_constraints={"video": True, "audio": False},
+    async_processing=True
+)
