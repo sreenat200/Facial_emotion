@@ -37,10 +37,6 @@ class SimpleCNN(torch.nn.Module, PyTorchModelHubMixin):
         x = self.classifier(x)
         return x
 
-# Load trained model from Hugging Face
-model = SimpleCNN.from_pretrained("sreenathsree1578/facial_emotion")
-model.eval()
-
 # Transform for image processing
 transform_live = transforms.Compose([
     transforms.Resize((48, 48)),
@@ -50,6 +46,19 @@ transform_live = transforms.Compose([
 
 # Emotion labels
 emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
+
+# Streamlit app
+st.title("Live Facial Emotion Detection")
+
+# Model selection
+model_option = st.selectbox(
+    "Select Model",
+    ["sreenathsree1578/facial_emotion", "sreenathsree1578/emotion_detection"]
+)
+
+# Load selected model
+model = SimpleCNN.from_pretrained(model_option)
+model.eval()
 
 # Custom VideoProcessor for streamlit-webrtc
 class EmotionProcessor(VideoProcessorBase):
@@ -74,9 +83,6 @@ class EmotionProcessor(VideoProcessorBase):
 
         return frame.from_ndarray(img, format="bgr24")
 
-# Streamlit app
-st.title("Live Facial Emotion Detection")
-
 # STUN configuration for WebRTC
 rtc_config = RTCConfiguration({
     "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
@@ -88,9 +94,9 @@ webrtc_streamer(
     video_processor_factory=EmotionProcessor,
     media_stream_constraints={
         "video": {
-            "width": {"ideal": 1280},  # Higher resolution (720p)
+            "width": {"ideal": 1280},
             "height": {"ideal": 720},
-            "frameRate": {"ideal": 30}  # Higher frame rate
+            "frameRate": {"ideal": 30}
         },
         "audio": False
     },
