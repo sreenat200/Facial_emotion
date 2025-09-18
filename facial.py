@@ -8,10 +8,39 @@ from huggingface_hub import PyTorchModelHubMixin, hf_hub_download
 import json
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
-# Define SimpleCNN architecture with PyTorchModelHubMixin
+# Define SimpleCNN architecture for facial_emotion (grayscale, in_channels=1)
 class SimpleCNN(torch.nn.Module, PyTorchModelHubMixin):
     def __init__(self, num_classes=7, in_channels=1):
         super(SimpleCNN, self).__init__()
+        self.features = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels, 32, 3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(2, 2),
+            torch.nn.Conv2d(32, 64, 3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(2, 2),
+            torch.nn.Conv2d(64, 128, 3, padding=1),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(2, 2)
+        )
+        self.classifier = torch.nn.Sequential(
+            torch.nn.Dropout(0.5),
+            torch.nn.Linear(128 * 6 * 6, 256),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(0.5),
+            torch.nn.Linear(256, num_classes)
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
+
+# Define EmotionDetectionCNN for emotion_detection (RGB, in_channels=3)
+class EmotionDetectionCNN(torch.nn.Module, PyTorchModelHubMixin):
+    def __init__(self, num_classes=7, in_channels=3):
+        super(EmotionDetectionCNN, self).__init__()
         self.features = torch.nn.Sequential(
             torch.nn.Conv2d(in_channels, 32, 3, padding=1),
             torch.nn.ReLU(),
@@ -58,24 +87,40 @@ model_option = st.selectbox(
 )
 
 @st.cache_resource
-def load_model(model_name):
+def load_facial_emotion_model():
     try:
-        config_path = hf_hub_download(repo_id=model_name, filename="config.json")
+        config_path = hf_hub_download(repo_id="sreenathsree1578/facial_emotion", filename="config.json")
         with open(config_path) as f:
             config = json.load(f)
         num_classes = config.get("num_classes", 7)
-        # Force in_channels=3 for emotion_detection, 1 for facial_emotion
-        in_channels = 3 if model_name == "sreenathsree1578/emotion_detection" else 1
-        model = SimpleCNN(num_classes=num_classes, in_channels=in_channels)
-        model = model.from_pretrained(model_name)
+        model = SimpleCNN(num_classes=num_classes, in_channels=1)
+        model = model.from_pretrained("sreenathsree1578/facial_emotion")
         model.eval()
-        return model, in_channels
+        return model, 1
     except Exception as e:
-        st.error(f"Error loading {model_name}: {str(e)}. Using default.")
+        st.error(f"Error loading facial_emotion: {str(e)}. Using default.")
+        return SimpleCNN(num_classes=7, in_channels=1), 1
+
+@st.cache_resource
+def load_emotion_detection_model():
+    try:
+        config_path = hf_hub_download(repo_id="sreenathsree1578/emotion_detection", filename="config.json")
+        with open(config_path) as f:
+            config = json.load(f)
+        num_classes = config.get("num_classes", 7)
+        model = EmotionDetectionCNN(num_classes=num_classes, in_channels=3)
+        model = model.from_pretrained("sreenathsree1578/emotion_detection")
+        model.eval()
+        return model, 3
+    except Exception as e:
+        st.error(f"Error loading emotion_detection: {str(e)}. Using default.")
         return SimpleCNN(num_classes=7, in_channels=1).from_pretrained("sreenathsree1578/facial_emotion"), 1
 
 # Load selected model
-model, in_channels = load_model(model_option)
+if model_option == "sreenathsree1578/facial_emotion":
+    model, in_channels = load_facial_emotion_model()
+else:
+    model, in_channels = load_emotion_detection_model()
 transform_live = get_transform(in_channels)
 
 # Custom VideoProcessor for streamlit-webrtc
@@ -121,4 +166,4 @@ webrtc_streamer(
     },
     async_processing=True,
     rtc_configuration=rtc_config
-)     
+)
