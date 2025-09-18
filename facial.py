@@ -163,22 +163,26 @@ rtc_config = RTCConfiguration({
     "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
 })
 
-# Start webcam stream with camera 1, fallback to camera 0
-webrtc_streamer(
-    key="emotion-detection",
-    video_processor_factory=EmotionProcessor,
-    media_stream_constraints={
-        "video": {
-            "width": {"ideal": resolution["width"]},
-            "height": {"ideal": resolution["height"]},
-            "frameRate": {"ideal": fps},
-            "deviceId": {"exact": 1}  # Try camera 1 first
+# Try camera 1, fallback to camera 0
+try:
+    webrtc_streamer(
+        key="emotion-detection",
+        video_processor_factory=EmotionProcessor,
+        media_stream_constraints={
+            "video": {
+                "width": {"ideal": resolution["width"]},
+                "height": {"ideal": resolution["height"]},
+                "frameRate": {"ideal": fps},
+                "deviceId": {"exact": 1}  # Try camera 1
+            },
+            "audio": False
         },
-        "audio": False
-    },
-    async_processing=True,
-    rtc_configuration=rtc_config,
-    video_processor_fallback=lambda: webrtc_streamer(
+        async_processing=True,
+        rtc_configuration=rtc_config
+    )
+except Exception as e:
+    st.warning(f"Camera 1 failed: {str(e)}. Switching to camera 0.")
+    webrtc_streamer(
         key="emotion-detection-fallback",
         video_processor_factory=EmotionProcessor,
         media_stream_constraints={
@@ -193,4 +197,3 @@ webrtc_streamer(
         async_processing=True,
         rtc_configuration=rtc_config
     )
-)
