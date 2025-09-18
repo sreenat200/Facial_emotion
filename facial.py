@@ -80,15 +80,15 @@ emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 # Streamlit app
 st.markdown("<h3>Live Facial Emotion Detection</h3>", unsafe_allow_html=True)
 
-# Model selection
-model_option = st.selectbox(
-    "Select Model",
-    ["sreenathsree1578/facial_emotion", "sreenathsree1578/emotion_detection"]
-)
-
-# Video quality and FPS selection
-quality = st.selectbox("Select Video Quality", ["Low (480p)", "Medium (720p)", "High (1080p)"])
-fps = st.selectbox("Select FPS", [15, 30, 60])
+# Sidebar for model, quality, and FPS selection
+with st.sidebar:
+    st.header("Settings")
+    model_option = st.selectbox(
+        "Select Model",
+        ["sreenathsree1578/facial_emotion", "sreenathsree1578/emotion_detection"]
+    )
+    quality = st.selectbox("Select Video Quality", ["Low (480p)", "Medium (720p)", "High (1080p)"])
+    fps = st.selectbox("Select FPS", [15, 30, 60])
 
 # Map quality to resolution
 quality_map = {
@@ -163,7 +163,7 @@ rtc_config = RTCConfiguration({
     "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
 })
 
-# Start webcam stream with first camera
+# Start webcam stream with camera 1, fallback to camera 0
 webrtc_streamer(
     key="emotion-detection",
     video_processor_factory=EmotionProcessor,
@@ -172,10 +172,25 @@ webrtc_streamer(
             "width": {"ideal": resolution["width"]},
             "height": {"ideal": resolution["height"]},
             "frameRate": {"ideal": fps},
-            "deviceId": {"exact": 0}
+            "deviceId": {"exact": 1}  # Try camera 1 first
         },
         "audio": False
     },
     async_processing=True,
-    rtc_configuration=rtc_config
+    rtc_configuration=rtc_config,
+    video_processor_fallback=lambda: webrtc_streamer(
+        key="emotion-detection-fallback",
+        video_processor_factory=EmotionProcessor,
+        media_stream_constraints={
+            "video": {
+                "width": {"ideal": resolution["width"]},
+                "height": {"ideal": resolution["height"]},
+                "frameRate": {"ideal": fps},
+                "deviceId": {"exact": 0}  # Fallback to camera 0
+            },
+            "audio": False
+        },
+        async_processing=True,
+        rtc_configuration=rtc_config
+    )
 )
