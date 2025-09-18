@@ -6,7 +6,7 @@ from PIL import Image
 import numpy as np
 from huggingface_hub import PyTorchModelHubMixin
 import safetensors
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
 # Define SimpleCNN architecture with PyTorchModelHubMixin
 class SimpleCNN(torch.nn.Module, PyTorchModelHubMixin):
@@ -77,10 +77,16 @@ class EmotionProcessor(VideoProcessorBase):
 # Streamlit app
 st.title("Live Facial Emotion Detection")
 
-# Start webcam stream
+# STUN configuration for WebRTC
+rtc_config = RTCConfiguration({
+    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+})
+
+# Start webcam stream with STUN configuration
 webrtc_streamer(
     key="emotion-detection",
     video_processor_factory=EmotionProcessor,
     media_stream_constraints={"video": True, "audio": False},
-    async_processing=True
+    async_processing=True,
+    rtc_configuration=rtc_config
 )
