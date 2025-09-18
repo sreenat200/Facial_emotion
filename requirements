@@ -4,4 +4,4 @@ torchvision
 Pillow
 numpy
 huggingface-hub
-opencv-python
+opencv-python-headless
