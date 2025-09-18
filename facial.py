@@ -1,4 +1,3 @@
-import cv2
 import torch
 from torchvision import transforms
 from PIL import Image
@@ -49,53 +48,28 @@ transform_live = transforms.Compose([
 # Emotion labels
 emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 
-# Global variables
-camera_on = False
-cap = None
-frame_placeholder = st.empty()
-
-# Function to start/stop camera
-def toggle_camera():
-    global camera_on, cap
-    if not camera_on:
-        cap = cv2.VideoCapture(0)
-        camera_on = True
-    else:
-        if cap is not None:
-            cap.release()
-        camera_on = False
-
 # Streamlit app
-st.title("Live Facial Emotion Detection")
+st.title("📷 Live Facial Emotion Detection")
 
-# Buttons
-if st.button("Start Emotion Detection"):
-    toggle_camera()
+st.write("Use the camera below to capture your face and detect emotions:")
 
-if st.button("Stop Emotion Detection"):
-    toggle_camera()
+# Camera input
+img_file_buffer = st.camera_input("Take a picture")
 
-# Display video feed
-while camera_on and cap is not None:
-    ret, frame = cap.read()
-    if ret:
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml').detectMultiScale(gray, 1.3, 5)
-        for (x, y, w, h) in faces:
-            face = gray[y:y+h, x:x+w]
-            face = cv2.resize(face, (48, 48))
-            face = transform_live(Image.fromarray(face)).unsqueeze(0)
-            with torch.no_grad():
-                output = model(face)
-                _, pred = torch.max(output, 1)
-                emotion = emotions[pred.item()]
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-            cv2.putText(frame, emotion, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame_placeholder.image(frame, channels="RGB", use_column_width=True)
-    else:
-        break
+if img_file_buffer is not None:
+    # Read image from buffer
+    image = Image.open(img_file_buffer).convert("L")  # convert to grayscale
+    image_resized = image.resize((48, 48))
+    
+    # Preprocess
+    face_tensor = transform_live(image_resized).unsqueeze(0)
 
-# Cleanup on app close
-if cap is not None and not cap.isOpened():
-    cap.release()
+    # Predict
+    with torch.no_grad():
+        output = model(face_tensor)
+        _, pred = torch.max(output, 1)
+        emotion = emotions[pred.item()]
+
+    # Show result
+    st.image(image, caption=f"Detected Emotion: **{emotion}**", use_column_width=True)
+    st.success(f"😊 Emotion detected: **{emotion}**")
