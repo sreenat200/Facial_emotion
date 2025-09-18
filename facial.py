@@ -1,5 +1,6 @@
 import cv2
 import torch
+import safetensors
 from torchvision import transforms
 from PIL import Image
 import streamlit as st
@@ -99,3 +100,4 @@ while camera_on and cap is not None:
 # Cleanup on app close
 if cap is not None and not cap.isOpened():
     cap.release()
+
