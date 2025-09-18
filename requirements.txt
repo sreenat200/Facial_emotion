@@ -4,6 +4,7 @@ torchvision
 Pillow
 numpy
 huggingface-hub
-opencv-python-headless
+opencv-python
 safetensors
+
 
