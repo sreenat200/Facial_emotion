@@ -92,9 +92,10 @@ with st.sidebar:
 
 # Map quality to resolution
 quality_map = {
+    "High (1080p)": {"width": 1920, "height": 1080},
     "Low (480p)": {"width": 854, "height": 480},
-    "Medium (720p)": {"width": 1280, "height": 720},
-    "High (1080p)": {"width": 1920, "height": 1080}
+    "Medium (720p)": {"width": 1280, "height": 720}
+    
 }
 resolution = quality_map[quality]
 
