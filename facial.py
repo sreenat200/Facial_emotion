@@ -60,19 +60,36 @@ model_option = st.selectbox(
 @st.cache_resource
 def load_model(model_name):
     try:
+        # Get model configuration
         config_path = hf_hub_download(repo_id=model_name, filename="config.json")
         with open(config_path) as f:
             config = json.load(f)
+        
+        # Determine input channels based on model name
+        if model_name == "sreenathsree1578/emotion_detection":
+            in_channels = 3  # RGB model
+        else:
+            in_channels = 1  # Grayscale model
+            
         num_classes = config.get("num_classes", 7)
-        # Force in_channels=3 for emotion_detection, 1 for facial_emotion
-        in_channels = 3 if model_name == "sreenathsree1578/emotion_detection" else 1
+        
+        # Load model with correct input channels
         model = SimpleCNN(num_classes=num_classes, in_channels=in_channels)
-        model = model.from_pretrained(model_name)
+        
+        # Load state dict
+        model_path = hf_hub_download(repo_id=model_name, filename="pytorch_model.bin")
+        state_dict = torch.load(model_path, map_location="cpu")
+        
+        # Load state dict with strict=False to handle potential mismatches
+        model.load_state_dict(state_dict, strict=False)
         model.eval()
+        
         return model, in_channels
     except Exception as e:
         st.error(f"Error loading {model_name}: {str(e)}. Using default.")
-        return SimpleCNN(num_classes=7, in_channels=1).from_pretrained("sreenathsree1578/facial_emotion"), 1
+        # Fallback to default model
+        model = SimpleCNN(num_classes=7, in_channels=1)
+        return model, 1
 
 # Load selected model
 model, in_channels = load_model(model_option)
@@ -89,13 +106,25 @@ class EmotionProcessor(VideoProcessorBase):
         faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
 
         for (x, y, w, h) in faces:
-            face = img[y:y+h, x:x+w] if in_channels == 3 else gray[y:y+h, x:x+w]
-            face = cv2.resize(face, (48, 48))
-            face = transform_live(Image.fromarray(face if in_channels == 3 else face, mode='RGB' if in_channels == 3 else 'L')).unsqueeze(0)
+            # Extract face region
+            if in_channels == 3:
+                # For RGB models, use color image
+                face_roi = img[y:y+h, x:x+w]
+                face_pil = Image.fromarray(face_roi, mode='RGB')
+            else:
+                # For grayscale models, use grayscale
+                face_roi = gray[y:y+h, x:x+w]
+                face_pil = Image.fromarray(face_roi, mode='L')
+            
+            # Transform and predict
+            face_tensor = transform_live(face_pil).unsqueeze(0)
+            
             with torch.no_grad():
-                output = model(face)
+                output = model(face_tensor)
                 _, pred = torch.max(output, 1)
                 emotion = emotions[pred.item()] if pred.item() < len(emotions) else "unknown"
+            
+            # Draw rectangle and label
             cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
             cv2.putText(img, emotion, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
 
