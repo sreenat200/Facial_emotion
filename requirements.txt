@@ -5,3 +5,5 @@ Pillow
 numpy
 huggingface-hub
 opencv-python-headless
+safetensors
+
