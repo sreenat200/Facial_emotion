@@ -8,7 +8,6 @@ from huggingface_hub import PyTorchModelHubMixin, hf_hub_download
 import json
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration
 
-# Define SimpleCNN architecture for facial_emotion (grayscale, in_channels=1)
 class SimpleCNN(torch.nn.Module, PyTorchModelHubMixin):
     def __init__(self, num_classes=7, in_channels=1):
         super(SimpleCNN, self).__init__()
@@ -37,7 +36,6 @@ class SimpleCNN(torch.nn.Module, PyTorchModelHubMixin):
         x = self.classifier(x)
         return x
 
-# Define EmotionDetectionCNN for emotion_detection (RGB, in_channels=3)
 class EmotionDetectionCNN(torch.nn.Module, PyTorchModelHubMixin):
     def __init__(self, num_classes=7, in_channels=3):
         super(EmotionDetectionCNN, self).__init__()
@@ -66,7 +64,6 @@ class EmotionDetectionCNN(torch.nn.Module, PyTorchModelHubMixin):
         x = self.classifier(x)
         return x
 
-# Transform for image processing
 def get_transform(in_channels):
     return transforms.Compose([
         transforms.Resize((48, 48)),
@@ -74,24 +71,20 @@ def get_transform(in_channels):
         transforms.Normalize((0.5,) * in_channels, (0.5,) * in_channels)
     ])
 
-# Emotion labels
 emotions = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
 
-# Streamlit app
 st.markdown("<h3>Live Facial Emotion Detection</h3>", unsafe_allow_html=True)
 
-# Sidebar for model, quality, and FPS selection with highest values as default
 with st.sidebar:
     st.header("Settings")
     model_option = st.selectbox(
         "Select Model",
         ["sreenathsree1578/facial_emotion", "sreenathsree1578/emotion_detection"],
-        index=0 # Default to emotion_detection
+        index=0 
     )
     quality = st.selectbox("Select Video Quality", ["Low (480p)", "Medium (720p)", "High (1080p)"], index=2)  # Default to High
-    fps = st.selectbox("Select FPS", [15, 30, 60], index=2)  # Default to 60
+    fps = st.selectbox("Select FPS", [15, 30, 60], index=2)  
 
-# Map quality to resolution
 quality_map = {
     "High (1080p)": {"width": 1920, "height": 1080},
     "Low (480p)": {"width": 854, "height": 480},
@@ -129,25 +122,22 @@ def load_emotion_detection_model():
         st.error(f"Error loading emotion_detection: {str(e)}. Using default.")
         return SimpleCNN(num_classes=7, in_channels=1).from_pretrained("sreenathsree1578/facial_emotion"), 1
 
-# Load selected model
 if model_option == "sreenathsree1578/facial_emotion":
     model, in_channels = load_facial_emotion_model()
 else:
     model, in_channels = load_emotion_detection_model()
 transform_live = get_transform(in_channels)
 
-# Emotion color mapping
 emotion_colors = {
-    'angry': (0, 0, 255),    # Red
-    'disgust': (0, 255, 0),  # Green
-    'fear': (255, 0, 0),     # Blue (default)
-    'happy': (255, 0, 0),    # Blue (default)
-    'sad': (0, 165, 255),    # Orange
-    'surprise': (255, 0, 0), # Blue (default)
-    'neutral': (255, 0, 0)   # Blue (default)
+    'angry': (0, 0, 255),
+    'disgust': (0, 255, 0),
+    'fear': (255, 0, 0),
+    'happy': (0, 255, 0),
+    'sad': (0, 165, 255),
+    'surprise': (0, 255, 255),
+    'neutral': (255, 0, 0)
 }
 
-# Custom VideoProcessor for streamlit-webrtc
 class EmotionProcessor(VideoProcessorBase):
     def __init__(self):
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -165,22 +155,18 @@ class EmotionProcessor(VideoProcessorBase):
                 output = model(face)
                 _, pred = torch.max(output, 1)
                 emotion = emotions[pred.item()] if pred.item() < len(emotions) else "unknown"
-            # Draw rectangle and text with emotion-specific color
-            color = emotion_colors.get(emotion, (255, 0, 0))  # Default to blue if unknown
+            color = emotion_colors.get(emotion, (255, 0, 0))  
             cv2.rectangle(img, (x, y), (x+w, y+h), color, 2)
-            # Add white background for text
             text_size = cv2.getTextSize(emotion, cv2.FONT_HERSHEY_SIMPLEX, 0.9, 2)[0]
-            cv2.rectangle(img, (x, y-35), (x+text_size[0], y-5), (255, 255, 255), -1)  # White background
+            cv2.rectangle(img, (x, y-35), (x+text_size[0], y-5), (255, 255, 255), -1)  
             cv2.putText(img, emotion, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
         return frame.from_ndarray(img, format="bgr24")
 
-# STUN configuration for WebRTC
 rtc_config = RTCConfiguration({
     "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
 })
 
-# Try camera 1, fallback to camera 0
 try:
     webrtc_streamer(
         key="emotion-detection",
@@ -190,7 +176,7 @@ try:
                 "width": {"ideal": resolution["width"]},
                 "height": {"ideal": resolution["height"]},
                 "frameRate": {"ideal": fps},
-                "deviceId": {"exact": 1}  # Try camera 1
+                "deviceId": {"exact": 1} 
             },
             "audio": False
         },
@@ -207,7 +193,7 @@ except Exception as e:
                 "width": {"ideal": resolution["width"]},
                 "height": {"ideal": resolution["height"]},
                 "frameRate": {"ideal": fps},
-                "deviceId": {"exact": 0}  # Fallback to camera 0
+                "deviceId": {"exact": 0}  
             },
             "audio": False
         },
