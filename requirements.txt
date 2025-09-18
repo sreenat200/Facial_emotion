@@ -1,10 +1,9 @@
 streamlit
+streamlit-webrtc
+opencv-python
 torch
 torchvision
-Pillow
+pillow
 numpy
-huggingface-hub
-opencv-python
 safetensors
-
-
+huggingface_hub
