@@ -139,11 +139,17 @@ emotion_colors = {
 }
 
 class EmotionProcessor(VideoProcessorBase):
-    def __init__(self):
+    def __init__(self, camera_id=1):
         self.face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        self.camera_id = camera_id  # Store camera ID
 
     def recv(self, frame):
         img = frame.to_ndarray(format="bgr24")
+        
+        # Prevent mirroring for camera 1; optionally mirror for camera 0
+        if self.camera_id == 0:
+            img = cv2.flip(img, 1)  # Mirror for camera 0 (fallback)
+        
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         faces = self.face_cascade.detectMultiScale(gray, 1.3, 5)
 
@@ -170,7 +176,7 @@ rtc_config = RTCConfiguration({
 try:
     webrtc_streamer(
         key="emotion-detection",
-        video_processor_factory=EmotionProcessor,
+        video_processor_factory=lambda: EmotionProcessor(camera_id=1),  # Pass camera_id=1
         media_stream_constraints={
             "video": {
                 "width": {"ideal": resolution["width"]},
@@ -187,7 +193,7 @@ except Exception as e:
     st.warning(f"Camera 1 failed: {str(e)}. Switching to camera 0.")
     webrtc_streamer(
         key="emotion-detection-fallback",
-        video_processor_factory=EmotionProcessor,
+        video_processor_factory=lambda: EmotionProcessor(camera_id=0),  # Pass camera_id=0
         media_stream_constraints={
             "video": {
                 "width": {"ideal": resolution["width"]},
